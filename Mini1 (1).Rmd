@@ -1,0 +1,108 @@
+---
+title: Boston Housing Analysis
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+```{r}
+# Load necessary libraries
+library(ggplot2)  # for visualization
+library(MASS)     # might use some of their statistical tools
+library(glmnet)   # for glm and model selection
+library(caret)    # for model training and testing
+
+# Load the data
+data <- read.csv("HousingData.csv")
+```
+
+Objective 1: Describe Probability as a Foundation of Statistical Modeling
+We’ll start by fitting a generalized linear model and discussing its aspects related to probability and inference.
+
+```{r}
+# Fitting a generalized linear model
+data <- na.omit(data)
+
+fit_glm <- glm(MEDV ~ ., data = data, family = gaussian(link = "identity"))
+
+# Display the summary of the model to analyze inference statistics
+summary(fit_glm)
+```
+
+
+```{r}
+# Assuming 'fit_glm' is your fitted model from glm()
+# Calculate predictions and residuals
+data$predicted <- predict(fit_glm, type = "response")  # make sure this matches your model's settings
+data$residuals <- residuals(fit_glm)
+
+# Now plot using these new columns in your data frame
+ggplot(data, aes(x = predicted, y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs. Predicted Values", x = "Predicted Values", y = "Residuals")
+```
+
+
+
+Objective 2: Apply the Appropriate Generalized Linear Model
+```{r}
+# Since we're using glm with Gaussian family, we are implying linear regression
+# Let's visualize the relationship of a significant predictor with MEDV
+ggplot(data, aes(x = RM, y = MEDV)) +
+  geom_point() +
+  geom_smooth(method = "glm", method.args = list(family = gaussian(link = "identity")), color = "blue") +
+  labs(title = "Relationship between Number of Rooms and House Value", x = "Number of Rooms", y = "House Value (MEDV)")
+
+```
+Objective 3: Conduct Model Selection for a Set of Candidate Models
+We’ll use LASSO and Ridge regression for model selection.
+
+```{r}
+# Prepare matrix for glmnet
+x <- model.matrix(MEDV ~ .-1, data = data) # -1 to omit intercept as glmnet adds its own
+y <- data$MEDV
+
+# Fit Lasso model
+lasso_model <- cv.glmnet(x, y, alpha = 1)
+plot(lasso_model)
+
+# Fit Ridge model
+ridge_model <- cv.glmnet(x, y, alpha = 0)
+plot(ridge_model)
+
+# Compare models and select best one based on cvm
+if(min(lasso_model$cvm) < min(ridge_model$cvm)) {
+  print("Lasso is better")
+} else {
+  print("Ridge is better")
+}
+```
+Objective 4: Communicate Results
+We’ll present findings clearly for a non-expert audience.
+
+```{r}
+# Presenting a clear plot of MEDV vs LSTAT with a linear model fit
+ggplot(data, aes(x = LSTAT, y = MEDV)) +
+  geom_point() +
+  geom_smooth(method = "glm", method.args = list(family = gaussian(link = "identity")), se = FALSE, color = "green") +
+  labs(title = "Influence of Lower Status Population on House Values", x = "Lower Status Population (%)", y = "House Value (MEDV)")
+```
+Objective 5: Use R to Fit and Assess Statistical Models
+```{r}
+# Use caret for advanced model evaluation
+set.seed(123) # for reproducibility
+train_index <- createDataPartition(y, p = 0.8, list = FALSE)
+train_data <- data[train_index,]
+test_data <- data[-train_index,]
+
+# Train model
+trained_model <- train(MEDV ~ ., data = train_data, method = "lm")
+
+# Predict and evaluate the model
+predictions <- predict(trained_model, test_data)
+results <- postResample(pred = predictions, obs = test_data$MEDV)
+print(results)
+```
+
